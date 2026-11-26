@@ -15,7 +15,7 @@ public class TripStateTest
 	private static InventoryState inv(int dense, int dark, int fragments)
 	{
 		int used = 2 + dense + dark + (fragments > 0 ? 1 : 0);
-		return new InventoryState(dense, dark, fragments, 0, 1, 28 - used);
+		return new InventoryState(dense, dark, fragments, 0, 1, 28 - used, 0);
 	}
 
 	private final TripState trip = new TripState();
@@ -81,7 +81,7 @@ public class TripStateTest
 		// Relog: flags come back from the RS profile, the previous inventory is unknown, and
 		// the inventory may read as empty for a few ticks before it loads.
 		TripState afterLogin = new TripState(trip.isCraftTrip(), trip.isFirstBindDone());
-		InventoryState empty = new InventoryState(0, 0, 0, 0, 0, 28);
+		InventoryState empty = new InventoryState(0, 0, 0, 0, 0, 28, 0);
 		InventoryState loaded = inv(0, 25, 104);
 		afterLogin.update(null, empty);
 		afterLogin.update(empty, empty);
@@ -129,5 +129,78 @@ public class TripStateTest
 		assertEquals(12, state.getDense());
 		assertEquals(16, state.getFreeSlots());
 		assertEquals(Stage.MINE, new TripState().stage(state));
+	}
+
+	private static InventoryState withRunes(int dark, int fragments, int runes)
+	{
+		return new InventoryState(0, dark, fragments, 0, 1, 26 - dark - (fragments > 0 ? 1 : 0), runes);
+	}
+
+	@Test
+	public void boundDetectsBothBinds()
+	{
+		// First bind: fragments used, dark blocks remain (chisel next).
+		assertTrue(TripState.bound(withRunes(25, 104, 0), withRunes(25, 0, 100)));
+		// Final bind: nothing left (73 rocks next).
+		assertTrue(TripState.bound(withRunes(0, 100, 100), withRunes(0, 0, 200)));
+		// Works without any trip flags (e.g. started mid-trip) since it only looks at the inventory.
+		assertTrue(TripState.bound(withRunes(0, 5, 0), withRunes(0, 0, 5)));
+		// Chiseling adds fragments, no runes.
+		assertFalse(TripState.bound(withRunes(25, 0, 100), withRunes(24, 4, 100)));
+		// Runes arriving a tick after the fragments are used still counts.
+		assertTrue(TripState.bound(withRunes(0, 100, 100), withRunes(0, 0, 100)));
+		// Unknown previous inventory (just logged in).
+		assertFalse(TripState.bound(null, withRunes(0, 0, 200)));
+	}
+
+	@Test
+	public void veneratedDetectsBothLoads()
+	{
+		assertTrue(TripState.venerated(inv(26, 0, 0), inv(0, 26, 0)));
+		assertTrue(TripState.venerated(inv(25, 0, 104), inv(0, 25, 104)));
+		assertFalse(TripState.venerated(inv(25, 0, 104), inv(26, 0, 104)));
+		assertFalse(TripState.venerated(inv(0, 26, 0), inv(0, 25, 4)));
+		assertFalse(TripState.venerated(null, inv(0, 26, 0)));
+	}
+
+	@Test
+	public void finishedChiselingOnlyOnLastBlock()
+	{
+		// Last block chiseled (load 1 at the Dark Altar, or load 2 at the Blood Altar).
+		assertTrue(TripState.finishedChiseling(inv(0, 1, 100), inv(0, 0, 104)));
+		// Still blocks left.
+		assertFalse(TripState.finishedChiseling(inv(0, 10, 60), inv(0, 9, 64)));
+		// Binding with no blocks: no dark blocks before either.
+		assertFalse(TripState.finishedChiseling(inv(0, 0, 100), inv(0, 0, 0)));
+		// Fragment stack updating a tick later still counts.
+		assertTrue(TripState.finishedChiseling(inv(0, 1, 100), inv(0, 0, 100)));
+		// Unknown previous inventory (just logged in).
+		assertFalse(TripState.finishedChiseling(null, inv(0, 0, 104)));
+	}
+
+	@Test
+	public void firstLoadChiselingNeverLooksLikeSecondLap()
+	{
+		// Even with a stale "craft trip" flag saved from an earlier session...
+		TripState stale = new TripState(true, true);
+		InventoryState mining = inv(10, 0, 0);
+		stale.update(null, mining);
+		assertFalse(stale.isCraftTrip());
+
+		InventoryState full = inv(26, 0, 0);
+		stale.update(mining, full);
+		InventoryState venerated = inv(0, 26, 0);
+		stale.update(full, venerated);
+		assertEquals(Stage.CHISEL, stale.stage(venerated));
+
+		// ...every chisel of load 1 stays CHISEL, never BIND.
+		InventoryState previous = venerated;
+		for (int dark = 25; dark >= 1; dark--)
+		{
+			InventoryState current = inv(0, dark, (26 - dark) * 4);
+			stale.update(previous, current);
+			assertEquals("dark=" + dark, Stage.CHISEL, stale.stage(current));
+			previous = current;
+		}
 	}
 }

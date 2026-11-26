@@ -11,8 +11,16 @@ Assumes 73+ Agility (uses the 69 and 73 shortcuts) and blood runes only.
 
 ## Features
 
-- **Next-action highlight:** flashes the next runestone, rock shortcut or altar. If the rocks or the Blood Altar are clickable on screen they are flashed directly; otherwise the tiles to walk to are highlighted.
+- **Next-action highlight:** flashes the next runestone, rock shortcut or altar. If the rocks or the Blood Altar are clickable on screen they are flashed directly; otherwise the (walkable) tiles to walk to are highlighted.
+- **Instant return prompt:** after the final bind, the 73 rocks are highlighted immediately instead of after the idle delay.
+- **Step Closer to Blood Altar (optional):** after venerating the second load, step a few tiles south of the Dark Altar and click the Blood Altar from there.
+- **Path lines:** walking path to the next destination on the floor and/or minimap.
 - **Inventory highlight:** chisel, dark essence block and inactive blood essence.
 - **Screen tint:** idle and active tints cover the whole client, including the inventory and side panels.
-- **Solace overlay:** logo watermark with an info panel showing stage, load (1/2 or 2/2), fragment count and the next step.
+- **Solace watermark:** movable, or fixed to the center of the client. The info panel (stage, load, fragments, next step) is a separate overlay.
 - **Survives relogs:** which load you're on is saved per account and restored on login.
+
+## Credits
+
+Dark Altar approach tile, Blood Altar reach and the Dark Altar to Blood Altar route are from
+[Jam's Arceuus Runecrafting](https://github.com/JamsRepos/zeah-rc-helper) (BSD 2-Clause).

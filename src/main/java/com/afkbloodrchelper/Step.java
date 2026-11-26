@@ -19,6 +19,7 @@ public enum Step
 	CHISEL("Chisel your dark essence blocks"),
 	CLIMB_TO_BLOOD_ALTAR("Climb the rocks towards the Blood Altar"),
 	WALK_TO_BLOOD_ALTAR("Head to the Blood Altar"),
+	STEP_CLOSER("Step closer to click the Blood Altar"),
 	BIND("Bind at the Blood Altar"),
 	ACTIVATE_ESSENCE("Activate your blood essence"),
 	ENABLE_RUN("Turn on run");

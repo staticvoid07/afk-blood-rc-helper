@@ -18,10 +18,11 @@ class InventoryState
 	int inactiveEssence;
 	int activeEssence;
 	int freeSlots;
+	int bloodRunes;
 
 	static InventoryState read(ItemContainer container)
 	{
-		int dense = 0, dark = 0, fragments = 0, inactive = 0, active = 0, used = 0;
+		int dense = 0, dark = 0, fragments = 0, inactive = 0, active = 0, used = 0, bloodRunes = 0;
 
 		// NOTE: the item array can be shorter than 28 (e.g. right after logging in when
 		// the trailing slots are empty), so free slots are counted from used slots.
@@ -41,6 +42,7 @@ class InventoryState
 					dark++;
 					break;
 				case BloodRcIds.DARK_ESSENCE_FRAGMENTS:
+					// NOTE: always quantity 1 in game; treat as "has fragments", not a count.
 					fragments += item.getQuantity();
 					break;
 				case BloodRcIds.BLOOD_ESSENCE_INACTIVE:
@@ -49,8 +51,11 @@ class InventoryState
 				case BloodRcIds.BLOOD_ESSENCE_ACTIVE:
 					active++;
 					break;
+				case BloodRcIds.BLOOD_RUNE:
+					bloodRunes += item.getQuantity();
+					break;
 			}
 		}
-		return new InventoryState(dense, dark, fragments, inactive, active, Math.max(0, INVENTORY_SIZE - used));
+		return new InventoryState(dense, dark, fragments, inactive, active, Math.max(0, INVENTORY_SIZE - used), bloodRunes);
 	}
 }

@@ -8,6 +8,7 @@ import java.awt.Polygon;
 import java.awt.Rectangle;
 import java.awt.Shape;
 import java.awt.geom.Area;
+import java.util.List;
 import javax.inject.Inject;
 import net.runelite.api.Client;
 import net.runelite.api.Perspective;
@@ -78,7 +79,19 @@ class HighlightOverlay extends Overlay
 		}
 		else if (target.getFallbackArea() != null)
 		{
-			highlightTiles(graphics, target.getFallbackArea(), color);
+			List<WorldPoint> stepCloserTiles = plugin.getStepCloserTiles();
+			if (target.getFallbackArea() == BloodRcIds.STEP_CLOSER_TO_BLOOD && !stepCloserTiles.isEmpty())
+			{
+				// Step Closer: every nearby tile (walkable or not) that walks the player into reach.
+				for (WorldPoint point : stepCloserTiles)
+				{
+					highlightTile(graphics, point, color);
+				}
+			}
+			else
+			{
+				highlightTiles(graphics, target.getFallbackArea(), color);
+			}
 		}
 		return null;
 	}
@@ -104,16 +117,24 @@ class HighlightOverlay extends Overlay
 	{
 		for (WorldPoint point : area.toWorldPointList())
 		{
-			LocalPoint local = LocalPoint.fromWorld(client.getTopLevelWorldView(), point);
-			if (local == null)
+			if (Pathfinder.isWalkable(client.getTopLevelWorldView(), point))
 			{
-				continue;
+				highlightTile(graphics, point, color);
 			}
-			Polygon poly = Perspective.getCanvasTilePoly(client, local);
-			if (poly != null)
-			{
-				OverlayUtil.renderPolygon(graphics, poly, color, color, new BasicStroke(1));
-			}
+		}
+	}
+
+	private void highlightTile(Graphics2D graphics, WorldPoint point, Color color)
+	{
+		LocalPoint local = LocalPoint.fromWorld(client.getTopLevelWorldView(), point);
+		if (local == null)
+		{
+			return;
+		}
+		Polygon poly = Perspective.getCanvasTilePoly(client, local);
+		if (poly != null)
+		{
+			OverlayUtil.renderPolygon(graphics, poly, color, color, new BasicStroke(1));
 		}
 	}
 }

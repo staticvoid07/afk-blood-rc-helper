@@ -6,6 +6,7 @@ import net.runelite.client.config.Config;
 import net.runelite.client.config.ConfigGroup;
 import net.runelite.client.config.ConfigItem;
 import net.runelite.client.config.ConfigSection;
+import net.runelite.client.config.Notification;
 import net.runelite.client.config.Range;
 import net.runelite.client.config.Units;
 
@@ -67,13 +68,35 @@ public interface AfkBloodRcHelperConfig extends Config
 		return true;
 	}
 
+	@ConfigItem(
+		keyName = "stepCloserToBloodAltar",
+		name = "Step Closer to Blood Altar",
+		description = "After venerating the second load, step a few tiles south of the Dark Altar and click the Blood Altar from there instead of walking.",
+		position = 3
+	)
+	default boolean stepCloserToBloodAltar()
+	{
+		return false;
+	}
+
+	@ConfigItem(
+		keyName = "notifyAction",
+		name = "Notify When Action Needed",
+		description = "Send a notification when you need to do something (once each time you go from busy to needing to act).",
+		position = 5
+	)
+	default Notification notifyAction()
+	{
+		return Notification.OFF;
+	}
+
 	@Range(min = 0, max = 5000)
 	@Units(Units.MILLISECONDS)
 	@ConfigItem(
 		keyName = "idleDelay",
 		name = "Idle Delay",
 		description = "How long the player must stand still before being considered idle.",
-		position = 3
+		position = 4
 	)
 	default int idleDelay()
 	{
@@ -97,11 +120,23 @@ public interface AfkBloodRcHelperConfig extends Config
 	}
 
 	@ConfigItem(
-		keyName = "showInfoPanel",
-		name = "Show Info Panel",
-		description = "Show the current blood runecrafting stage below the watermark.",
+		keyName = "centerWatermark",
+		name = "Center Watermark",
+		description = "Fix the watermark to the center of the client instead of a movable overlay.",
 		section = sectionSolace,
 		position = 2
+	)
+	default boolean centerWatermark()
+	{
+		return false;
+	}
+
+	@ConfigItem(
+		keyName = "showInfoPanel",
+		name = "Show Info Panel",
+		description = "Show the info panel with the current blood runecrafting stage.",
+		section = sectionSolace,
+		position = 3
 	)
 	default boolean showInfoPanel()
 	{
@@ -134,13 +169,38 @@ public interface AfkBloodRcHelperConfig extends Config
 		return true;
 	}
 
+	@ConfigItem(
+		keyName = "pathDisplay",
+		name = "Path Display",
+		description = "Where to draw the walking path to the next destination.",
+		section = sectionAction,
+		position = 3
+	)
+	default PathDisplay pathDisplay()
+	{
+		return PathDisplay.FLOOR_AND_MINIMAP;
+	}
+
+	@Alpha
+	@ConfigItem(
+		keyName = "pathColor",
+		name = "Path Color",
+		description = "Color of the path line.",
+		section = sectionAction,
+		position = 4
+	)
+	default Color pathColor()
+	{
+		return new Color(0, 200, 255, 200);
+	}
+
 	@Alpha
 	@ConfigItem(
 		keyName = "actionColor",
 		name = "Color",
 		description = "Highlight color.",
 		section = sectionAction,
-		position = 3
+		position = 5
 	)
 	default Color actionColor()
 	{
@@ -152,7 +212,7 @@ public interface AfkBloodRcHelperConfig extends Config
 		name = "Flashing",
 		description = "Flash between two colors.",
 		section = sectionAction,
-		position = 4
+		position = 6
 	)
 	default boolean actionFlash()
 	{
@@ -165,7 +225,7 @@ public interface AfkBloodRcHelperConfig extends Config
 		name = "Color 2",
 		description = "Second color used when flashing.",
 		section = sectionAction,
-		position = 5
+		position = 7
 	)
 	default Color actionColor2()
 	{
@@ -179,7 +239,7 @@ public interface AfkBloodRcHelperConfig extends Config
 		name = "Color 1 Time",
 		description = "Milliseconds to show color 1 when flashing.",
 		section = sectionAction,
-		position = 6
+		position = 8
 	)
 	default int actionColor1Time()
 	{
@@ -193,7 +253,7 @@ public interface AfkBloodRcHelperConfig extends Config
 		name = "Color 2 Time",
 		description = "Milliseconds to show color 2 when flashing.",
 		section = sectionAction,
-		position = 7
+		position = 9
 	)
 	default int actionColor2Time()
 	{

@@ -2,6 +2,9 @@ package com.afkbloodrchelper;
 
 import com.google.inject.Provides;
 import java.awt.Color;
+import java.util.Collections;
+import java.util.List;
+import java.util.function.Predicate;
 import javax.inject.Inject;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -14,6 +17,7 @@ import net.runelite.api.Player;
 import net.runelite.api.Scene;
 import net.runelite.api.Tile;
 import net.runelite.api.TileObject;
+import net.runelite.api.coords.WorldArea;
 import net.runelite.api.coords.WorldPoint;
 import net.runelite.api.events.ClientTick;
 import net.runelite.api.events.DecorativeObjectDespawned;
@@ -30,6 +34,7 @@ import net.runelite.api.gameval.InterfaceID;
 import net.runelite.api.gameval.InventoryID;
 import net.runelite.api.gameval.VarPlayerID;
 import net.runelite.api.widgets.Widget;
+import net.runelite.client.Notifier;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
@@ -50,6 +55,12 @@ public class AfkBloodRcHelperPlugin extends Plugin
 	private static final String KEY_FIRST_BIND_DONE = "firstBindDone";
 	private static final int ANIMATION_IDLE = -1;
 
+	/**
+	 * How long an inventory change counts as activity. Covers short gaps without an animation,
+	 * e.g. the first chisel (no animation) before automatic chiseling of the rest starts.
+	 */
+	private static final long INVENTORY_ACTIVITY_MILLIS = 1200;
+
 	@Inject
 	private Client client;
 
@@ -66,6 +77,9 @@ public class AfkBloodRcHelperPlugin extends Plugin
 	private OverlayManager overlayManager;
 
 	@Inject
+	private Notifier notifier;
+
+	@Inject
 	private HighlightOverlay highlightOverlay;
 
 	@Inject
@@ -75,7 +89,19 @@ public class AfkBloodRcHelperPlugin extends Plugin
 	private TintOverlay tintOverlay;
 
 	@Inject
-	private SolaceOverlay solaceOverlay;
+	private WatermarkOverlay watermarkOverlay;
+
+	@Inject
+	private CenteredWatermarkOverlay centeredWatermarkOverlay;
+
+	@Inject
+	private InfoPanelOverlay infoPanelOverlay;
+
+	@Inject
+	private PathOverlay pathOverlay;
+
+	@Inject
+	private PathMinimapOverlay pathMinimapOverlay;
 
 	// Tracked scene objects. These are tracked regardless of where the player is, so they
 	// are already known when the player logs in (or loads a new scene) inside the area.
@@ -90,10 +116,25 @@ public class AfkBloodRcHelperPlugin extends Plugin
 	@Getter(AccessLevel.PACKAGE)
 	private boolean inArea;
 
-	@Getter(AccessLevel.PACKAGE)
 	private boolean idle = true;
 
+	/**
+	 * Set right after venerating, binding or chiseling the last block so the next step is highlighted (and the idle
+	 * tint shown) immediately, without waiting for the animation to end or the idle delay.
+	 * Cleared once the player acts: moves, changes the inventory (chisel, bind, venerate), or the
+	 * stage changes. Animations aren't used, since the previous action's animation is often still
+	 * playing when the prompt appears.
+	 */
+	private boolean promptImmediately;
+
+	/** True once a notification was sent for the current "action needed" stretch; reset when busy again. */
+	private boolean notifiedForAction;
+	private WorldPoint promptLocation;
+	private InventoryState promptInventory;
+	private Stage promptStage;
+
 	private long lastActiveMillis;
+	private volatile long lastInventoryChangeMillis;
 
 	@Getter(AccessLevel.PACKAGE)
 	private boolean levelUpOpen;
@@ -106,6 +147,22 @@ public class AfkBloodRcHelperPlugin extends Plugin
 
 	@Getter(AccessLevel.PACKAGE)
 	private Target target = Target.NONE;
+
+	/**
+	 * Walking path to the current target, recomputed every tick.
+	 */
+	@Getter(AccessLevel.PACKAGE)
+	private List<WorldPoint> path = Collections.emptyList();
+	private WorldPoint pathFrom;
+	private Target pathTarget;
+
+	/**
+	 * Tiles to highlight for the Step Closer step (walkable or not): clicking any of them walks the
+	 * player a short way to a tile within reach of the Blood Altar. Recomputed when the player moves.
+	 */
+	@Getter(AccessLevel.PACKAGE)
+	private List<WorldPoint> stepCloserTiles = Collections.emptyList();
+	private WorldPoint stepCloserFrom;
 
 	@Getter(AccessLevel.PACKAGE)
 	private InventoryState inventory;
@@ -129,7 +186,11 @@ public class AfkBloodRcHelperPlugin extends Plugin
 		overlayManager.add(tintOverlay);
 		overlayManager.add(highlightOverlay);
 		overlayManager.add(inventoryHighlightOverlay);
-		overlayManager.add(solaceOverlay);
+		overlayManager.add(watermarkOverlay);
+		overlayManager.add(centeredWatermarkOverlay);
+		overlayManager.add(infoPanelOverlay);
+		overlayManager.add(pathOverlay);
+		overlayManager.add(pathMinimapOverlay);
 
 		clientThread.invokeLater(() ->
 		{
@@ -147,7 +208,11 @@ public class AfkBloodRcHelperPlugin extends Plugin
 		overlayManager.remove(tintOverlay);
 		overlayManager.remove(highlightOverlay);
 		overlayManager.remove(inventoryHighlightOverlay);
-		overlayManager.remove(solaceOverlay);
+		overlayManager.remove(watermarkOverlay);
+		overlayManager.remove(centeredWatermarkOverlay);
+		overlayManager.remove(infoPanelOverlay);
+		overlayManager.remove(pathOverlay);
+		overlayManager.remove(pathMinimapOverlay);
 		clearObjects();
 		resetSessionState();
 	}
@@ -198,6 +263,13 @@ public class AfkBloodRcHelperPlugin extends Plugin
 		target = Target.NONE;
 		inventory = null;
 		previousInventory = null;
+		clearPrompt();
+		notifiedForAction = false;
+		path = Collections.emptyList();
+		stepCloserTiles = Collections.emptyList();
+		stepCloserFrom = null;
+		pathFrom = null;
+		pathTarget = null;
 	}
 
 	private void loadTripState()
@@ -398,10 +470,11 @@ public class AfkBloodRcHelperPlugin extends Plugin
 			return;
 		}
 
-		boolean active = player.getAnimation() != ANIMATION_IDLE
-			|| player.getPoseAnimation() != player.getIdlePoseAnimation();
-
 		long now = System.currentTimeMillis();
+		boolean active = player.getAnimation() != ANIMATION_IDLE
+			|| player.getPoseAnimation() != player.getIdlePoseAnimation()
+			|| now - lastInventoryChangeMillis < INVENTORY_ACTIVITY_MILLIS;
+
 		if (active)
 		{
 			lastActiveMillis = now;
@@ -434,6 +507,7 @@ public class AfkBloodRcHelperPlugin extends Plugin
 			step = null;
 			target = Target.NONE;
 			previousInventory = null;
+			path = Collections.emptyList();
 			return;
 		}
 
@@ -450,19 +524,57 @@ public class AfkBloodRcHelperPlugin extends Plugin
 		}
 
 		InventoryState current = InventoryState.read(container);
+		boolean inventoryChanged = previousInventory != null && !current.equals(previousInventory);
+		if (inventoryChanged)
+		{
+			lastInventoryChangeMillis = System.currentTimeMillis();
+		}
+		// Venerating, binding or running out of blocks to chisel: show the next step right away.
+		boolean promptNow = TripState.venerated(previousInventory, current)
+			|| TripState.bound(previousInventory, current)
+			|| TripState.finishedChiseling(previousInventory, current);
 		TripState before = new TripState(tripState.isCraftTrip(), tripState.isFirstBindDone());
 		tripState.update(previousInventory, current);
 		saveTripState(before);
 		previousInventory = current;
 		inventory = current;
 
-		decideNextAction(location, current);
+		decideNextAction(location, current, promptNow);
+
+		notifyIfActionNeeded();
+		updateStepCloserTiles(location);
+		if (config.pathDisplay() == PathDisplay.OFF)
+		{
+			path = Collections.emptyList();
+			pathFrom = null;
+		}
+		else if (!location.equals(pathFrom) || !target.equals(pathTarget))
+		{
+			// Only re-path when the player or the destination changed.
+			path = findPath(location);
+			pathFrom = location;
+			pathTarget = target;
+		}
 	}
 
-	private void decideNextAction(WorldPoint location, InventoryState inv)
+	private void decideNextAction(WorldPoint location, InventoryState inv, boolean promptNow)
 	{
 		stage = tripState.stage(inv);
 		routeStage(location, inv);
+
+		if (promptNow)
+		{
+			// Don't wait for the venerate/bind animation to finish or the idle delay.
+			promptImmediately = true;
+			promptLocation = location;
+			promptInventory = inv;
+			promptStage = stage;
+		}
+		else if (promptImmediately
+			&& (stage != promptStage || !location.equals(promptLocation) || !inv.equals(promptInventory)))
+		{
+			clearPrompt();
+		}
 
 		boolean runEnabled = client.getVarpValue(VarPlayerID.OPTION_RUN) == 1;
 		if (config.suggestRun() && !runEnabled && client.getEnergy() > 50 * 100
@@ -525,13 +637,188 @@ public class AfkBloodRcHelperPlugin extends Plugin
 				}
 				else
 				{
-					// Still north of the walk tiles means still on the way from the Dark Altar.
-					boolean walking = location.getY() >= BloodRcIds.WALK_DARK_TO_BLOOD.getY() + BloodRcIds.WALK_DARK_TO_BLOOD.getHeight();
-					step = walking ? Step.WALK_TO_BLOOD_ALTAR : Step.BIND;
-					target = Target.object(bloodAltar, walking ? BloodRcIds.WALK_DARK_TO_BLOOD : null);
+					routeToBloodAltar(location);
 				}
 				break;
 		}
+	}
+
+	private void routeToBloodAltar(WorldPoint location)
+	{
+		boolean inReach = BloodRcIds.distanceToBloodAltar(location) <= BloodRcIds.BLOOD_ALTAR_REACH;
+		if (bloodAltar != null && inReach)
+		{
+			// Close enough to click: the altar flashes as soon as it's on screen.
+			step = Step.BIND;
+			target = Target.object(bloodAltar, isNorthOf(location, BloodRcIds.WALK_DARK_TO_BLOOD) ? BloodRcIds.WALK_DARK_TO_BLOOD : null);
+		}
+		else if (config.stepCloserToBloodAltar() && bloodAltar != null
+			&& location.distanceTo(BloodRcIds.DARK_APPROACH) <= 8)
+		{
+			// Altar is loaded but just out of reach from the Dark Altar: a few steps south fixes that.
+			step = Step.STEP_CLOSER;
+			target = Target.object(null, BloodRcIds.STEP_CLOSER_TO_BLOOD);
+		}
+		else
+		{
+			// Out of reach (clicking it wouldn't work) or not loaded: walk.
+			step = Step.WALK_TO_BLOOD_ALTAR;
+			target = Target.object(null, BloodRcIds.WALK_DARK_TO_BLOOD);
+		}
+	}
+
+	private void notifyIfActionNeeded()
+	{
+		boolean actionNeeded = step != null && target != Target.NONE && isIdle() && !levelUpOpen;
+		if (!actionNeeded)
+		{
+			notifiedForAction = false;
+			return;
+		}
+		if (!notifiedForAction)
+		{
+			notifiedForAction = true;
+			if (config.notifyAction().isEnabled())
+			{
+				notifier.notify(config.notifyAction(), "Blood RC: " + step.getText());
+			}
+		}
+	}
+
+	private void updateStepCloserTiles(WorldPoint location)
+	{
+		if (step != Step.STEP_CLOSER)
+		{
+			stepCloserTiles = Collections.emptyList();
+			stepCloserFrom = null;
+			return;
+		}
+		if (location.equals(stepCloserFrom))
+		{
+			return;
+		}
+		stepCloserFrom = location;
+
+		Pathfinder.DistanceMap map = Pathfinder.distances(client.getTopLevelWorldView(), location);
+		List<WorldPoint> tiles = new java.util.ArrayList<>();
+		for (WorldPoint candidate : BloodRcIds.STEP_CLOSER_CANDIDATES.toWorldPointList())
+		{
+			WorldPoint destination = Pathfinder.clickDestination(map, candidate);
+			if (destination != null
+				&& BloodRcIds.distanceToBloodAltar(destination) <= BloodRcIds.BLOOD_ALTAR_REACH
+				&& map.get(destination) <= BloodRcIds.STEP_CLOSER_MAX_WALK)
+			{
+				tiles.add(candidate);
+			}
+		}
+
+		// To be safe, leave out the southmost row of what would be shown.
+		int southmost = tiles.stream().mapToInt(WorldPoint::getY).min().orElse(Integer.MIN_VALUE);
+		tiles.removeIf(p -> p.getY() == southmost);
+		stepCloserTiles = tiles;
+	}
+
+	// ------------------------------------------------------------------------------------
+	// Path
+	// ------------------------------------------------------------------------------------
+
+	private List<WorldPoint> findPath(WorldPoint location)
+	{
+		TileObject object = target.getObject();
+		WorldArea area = target.getFallbackArea();
+		if (object == null && area == null)
+		{
+			return Collections.emptyList();
+		}
+
+		if (object != null)
+		{
+			List<WorldPoint> toObject = Pathfinder.find(client.getTopLevelWorldView(), location, nextTo(object));
+			if (!toObject.isEmpty())
+			{
+				return toObject;
+			}
+		}
+		if (area != null)
+		{
+			List<WorldPoint> toArea = Pathfinder.find(client.getTopLevelWorldView(), location, area::contains);
+			if (!toArea.isEmpty())
+			{
+				return toArea;
+			}
+		}
+		if (step == Step.WALK_TO_BLOOD_ALTAR)
+		{
+			// The walk loops west around the ridge and can leave the loaded scene; use the
+			// recorded route from the nearest waypoint onwards.
+			return recordedBloodApproach(location);
+		}
+		return Collections.emptyList();
+	}
+
+	/**
+	 * Goal: any tile next to (but not on) the object's footprint.
+	 */
+	private Predicate<WorldPoint> nextTo(TileObject object)
+	{
+		int minX, minY, maxX, maxY;
+		int baseX = client.getTopLevelWorldView().getBaseX();
+		int baseY = client.getTopLevelWorldView().getBaseY();
+		if (object instanceof GameObject)
+		{
+			GameObject gameObject = (GameObject) object;
+			minX = baseX + gameObject.getSceneMinLocation().getX();
+			minY = baseY + gameObject.getSceneMinLocation().getY();
+			maxX = baseX + gameObject.getSceneMaxLocation().getX();
+			maxY = baseY + gameObject.getSceneMaxLocation().getY();
+		}
+		else
+		{
+			WorldPoint p = object.getWorldLocation();
+			minX = maxX = p.getX();
+			minY = maxY = p.getY();
+		}
+		final int x1 = minX, y1 = minY, x2 = maxX, y2 = maxY;
+		return p ->
+		{
+			boolean inside = p.getX() >= x1 && p.getX() <= x2 && p.getY() >= y1 && p.getY() <= y2;
+			return !inside && p.getX() >= x1 - 1 && p.getX() <= x2 + 1 && p.getY() >= y1 - 1 && p.getY() <= y2 + 1;
+		};
+	}
+
+	private static List<WorldPoint> recordedBloodApproach(WorldPoint location)
+	{
+		List<WorldPoint> route = BloodRcIds.BLOOD_APPROACH;
+		int nearest = 0;
+		for (int i = 1; i < route.size(); i++)
+		{
+			if (location.distanceTo(route.get(i)) < location.distanceTo(route.get(nearest)))
+			{
+				nearest = i;
+			}
+		}
+		List<WorldPoint> path = new java.util.ArrayList<>();
+		path.add(location);
+		path.addAll(route.subList(nearest, route.size()));
+		return path;
+	}
+
+	private static boolean isNorthOf(WorldPoint location, WorldArea area)
+	{
+		return location.getY() >= area.getY() + area.getHeight();
+	}
+
+	private void clearPrompt()
+	{
+		promptImmediately = false;
+		promptLocation = null;
+		promptInventory = null;
+		promptStage = null;
+	}
+
+	boolean isIdle()
+	{
+		return idle || promptImmediately;
 	}
 
 	private TileObject shortcut73()

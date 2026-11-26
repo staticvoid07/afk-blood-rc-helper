@@ -37,10 +37,7 @@ class TripState
 	{
 		if (previous != null)
 		{
-			boolean venerated = previous.getDense() > 0
-				&& current.getDense() < previous.getDense()
-				&& current.getDark() > previous.getDark();
-			if (venerated)
+			if (venerated(previous, current))
 			{
 				craftTrip = previous.getFragments() > 0;
 				firstBindDone = false;
@@ -59,10 +56,52 @@ class TripState
 			}
 		}
 
+		if (current.getDense() > 0 && current.getFragments() == 0)
+		{
+			// Mining without any fragments can only be the first load, whatever was saved before.
+			craftTrip = false;
+			firstBindDone = false;
+		}
+
 		if (craftTrip && current.getDark() > 0 && current.getFragments() == 0)
 		{
 			firstBindDone = true;
 		}
+	}
+
+	/**
+	 * Dense essence was just turned into dark essence at the Dark Altar.
+	 */
+	static boolean venerated(InventoryState previous, InventoryState current)
+	{
+		return previous != null
+			&& previous.getDense() > 0
+			&& current.getDense() < previous.getDense()
+			&& current.getDark() > previous.getDark();
+	}
+
+	/**
+	 * The last dark essence block was just chiseled into fragments. Only the blocks are checked,
+	 * in case the fragment stack updates on a different tick.
+	 */
+	static boolean finishedChiseling(InventoryState previous, InventoryState current)
+	{
+		return previous != null
+			&& previous.getDark() > 0
+			&& current.getDark() == 0
+			&& current.getDense() == 0;
+	}
+
+	/**
+	 * Fragments were just bound into blood runes at the Blood Altar (either bind of the trip).
+	 * Only the fragments are checked, in case the rune stack updates on a different tick.
+	 * Decided from the inventory alone, so it works even if the trip flags were lost.
+	 */
+	static boolean bound(InventoryState previous, InventoryState current)
+	{
+		return previous != null
+			&& previous.getFragments() > 0
+			&& current.getFragments() < previous.getFragments();
 	}
 
 	Stage stage(InventoryState inv)
