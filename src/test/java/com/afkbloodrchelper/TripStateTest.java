@@ -3,10 +3,7 @@ package com.afkbloodrchelper;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 import net.runelite.api.Item;
-import net.runelite.api.ItemContainer;
 import org.junit.Test;
 
 public class TripStateTest
@@ -122,10 +119,7 @@ public class TripStateTest
 		{
 			items[i] = new Item(BloodRcIds.DENSE_ESSENCE_BLOCK, 1);
 		}
-		ItemContainer container = mock(ItemContainer.class);
-		when(container.getItems()).thenReturn(items);
-
-		InventoryState state = InventoryState.read(container);
+		InventoryState state = InventoryState.read(items);
 		assertEquals(12, state.getDense());
 		assertEquals(16, state.getFreeSlots());
 		assertEquals(Stage.MINE, new TripState().stage(state));

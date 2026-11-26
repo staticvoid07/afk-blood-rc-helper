@@ -22,11 +22,16 @@ class InventoryState
 
 	static InventoryState read(ItemContainer container)
 	{
+		return read(container.getItems());
+	}
+
+	static InventoryState read(Item[] items)
+	{
 		int dense = 0, dark = 0, fragments = 0, inactive = 0, active = 0, used = 0, bloodRunes = 0;
 
 		// NOTE: the item array can be shorter than 28 (e.g. right after logging in when
 		// the trailing slots are empty), so free slots are counted from used slots.
-		for (Item item : container.getItems())
+		for (Item item : items)
 		{
 			if (item.getId() == -1 || item.getQuantity() <= 0)
 			{
