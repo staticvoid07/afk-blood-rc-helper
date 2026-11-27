@@ -47,7 +47,7 @@ import net.runelite.client.ui.overlay.OverlayManager;
 @PluginDescriptor(
 	name = "AFK Blood RC Helper",
 	description = "Contextual highlights, screen tint and a stage panel for blood runecrafting",
-	tags = {"runecrafting", "rc", "blood", "afk", "skilling", "arceuus", "solace"}
+	tags = {"runecrafting", "rc", "blood", "afk", "skilling", "arceuus"}
 )
 public class AfkBloodRcHelperPlugin extends Plugin
 {
@@ -87,12 +87,6 @@ public class AfkBloodRcHelperPlugin extends Plugin
 
 	@Inject
 	private TintOverlay tintOverlay;
-
-	@Inject
-	private WatermarkOverlay watermarkOverlay;
-
-	@Inject
-	private CenteredWatermarkOverlay centeredWatermarkOverlay;
 
 	@Inject
 	private InfoPanelOverlay infoPanelOverlay;
@@ -186,8 +180,6 @@ public class AfkBloodRcHelperPlugin extends Plugin
 		overlayManager.add(tintOverlay);
 		overlayManager.add(highlightOverlay);
 		overlayManager.add(inventoryHighlightOverlay);
-		overlayManager.add(watermarkOverlay);
-		overlayManager.add(centeredWatermarkOverlay);
 		overlayManager.add(infoPanelOverlay);
 		overlayManager.add(pathOverlay);
 		overlayManager.add(pathMinimapOverlay);
@@ -208,8 +200,6 @@ public class AfkBloodRcHelperPlugin extends Plugin
 		overlayManager.remove(tintOverlay);
 		overlayManager.remove(highlightOverlay);
 		overlayManager.remove(inventoryHighlightOverlay);
-		overlayManager.remove(watermarkOverlay);
-		overlayManager.remove(centeredWatermarkOverlay);
 		overlayManager.remove(infoPanelOverlay);
 		overlayManager.remove(pathOverlay);
 		overlayManager.remove(pathMinimapOverlay);

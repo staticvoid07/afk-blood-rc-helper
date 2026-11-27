@@ -16,13 +16,6 @@ public interface AfkBloodRcHelperConfig extends Config
 	String GROUP = "afkbloodrchelper";
 
 	@ConfigSection(
-		name = "Solace Overlay",
-		description = "Watermark and info panel shown while in the blood runecrafting area.",
-		position = 0
-	)
-	String sectionSolace = "solace";
-
-	@ConfigSection(
 		name = "Highlight Next Action",
 		description = "Highlight the next thing to click.",
 		position = 10
@@ -45,6 +38,17 @@ public interface AfkBloodRcHelperConfig extends Config
 	String sectionActiveTint = "activeTint";
 
 	// ---- General ----
+
+	@ConfigItem(
+		keyName = "showInfoPanel",
+		name = "Show Info Panel",
+		description = "Show the info panel with the current blood runecrafting stage.",
+		position = 0
+	)
+	default boolean showInfoPanel()
+	{
+		return true;
+	}
 
 	@ConfigItem(
 		keyName = "suggestRun",
@@ -101,46 +105,6 @@ public interface AfkBloodRcHelperConfig extends Config
 	default int idleDelay()
 	{
 		return 600;
-	}
-
-	// ---- Solace overlay ----
-
-	@Range(min = 50, max = 256)
-	@Units(Units.PIXELS)
-	@ConfigItem(
-		keyName = "watermarkSize",
-		name = "Watermark Size",
-		description = "Size of the Solace logo (longest side).",
-		section = sectionSolace,
-		position = 1
-	)
-	default int watermarkSize()
-	{
-		return 128;
-	}
-
-	@ConfigItem(
-		keyName = "centerWatermark",
-		name = "Center Watermark",
-		description = "Fix the watermark to the center of the client instead of a movable overlay.",
-		section = sectionSolace,
-		position = 2
-	)
-	default boolean centerWatermark()
-	{
-		return false;
-	}
-
-	@ConfigItem(
-		keyName = "showInfoPanel",
-		name = "Show Info Panel",
-		description = "Show the info panel with the current blood runecrafting stage.",
-		section = sectionSolace,
-		position = 3
-	)
-	default boolean showInfoPanel()
-	{
-		return true;
 	}
 
 	// ---- Highlight ----

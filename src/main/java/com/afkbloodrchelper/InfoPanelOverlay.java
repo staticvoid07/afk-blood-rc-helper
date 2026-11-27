@@ -11,12 +11,11 @@ import net.runelite.client.ui.overlay.components.LineComponent;
 import net.runelite.client.ui.overlay.components.TitleComponent;
 
 /**
- * Info panel with the current blood runecrafting stage. Separate from the watermark so it
- * can be moved on its own.
+ * Info panel with the current blood runecrafting stage.
  */
 class InfoPanelOverlay extends OverlayPanel
 {
-	private static final Color SOLACE_BLUE = new Color(70, 140, 255);
+	private static final Color TITLE_COLOR = new Color(70, 140, 255);
 
 	private final AfkBloodRcHelperPlugin plugin;
 	private final AfkBloodRcHelperConfig config;
@@ -29,7 +28,8 @@ class InfoPanelOverlay extends OverlayPanel
 		this.config = config;
 
 		setPosition(OverlayPosition.TOP_LEFT);
-		// Above the full-screen tint (see WatermarkOverlay).
+		// Same layer as the full-screen tint. Within a layer, DYNAMIC overlays (the tint and
+		// highlights) render before positioned ones, so the panel draws on top of the tint.
 		setLayer(OverlayLayer.ALWAYS_ON_TOP);
 		setPriority(PRIORITY_MED);
 	}
@@ -50,7 +50,7 @@ class InfoPanelOverlay extends OverlayPanel
 		panelComponent.getChildren().clear();
 		panelComponent.getChildren().add(TitleComponent.builder()
 			.text("Blood Runecrafting")
-			.color(SOLACE_BLUE)
+			.color(TITLE_COLOR)
 			.build());
 
 		Stage stage = plugin.getStage();

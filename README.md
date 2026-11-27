@@ -1,6 +1,6 @@
 # AFK Blood RC Helper
 
-Contextual highlights, whole-screen idle tint and a Solace stage panel for Arceuus blood runecrafting.
+Contextual highlights, whole-screen idle tint, path lines and a stage panel for Arceuus blood runecrafting.
 
 Assumes 73+ Agility (uses the 69 and 73 shortcuts) and blood runes only.
 
@@ -17,7 +17,7 @@ Assumes 73+ Agility (uses the 69 and 73 shortcuts) and blood runes only.
 - **Path lines:** walking path to the next destination on the floor and/or minimap.
 - **Inventory highlight:** chisel, dark essence block and inactive blood essence.
 - **Screen tint:** idle and active tints cover the whole client, including the inventory and side panels.
-- **Solace watermark:** movable, or fixed to the center of the client. The info panel (stage, load, fragments, next step) is a separate overlay.
+- **Info panel:** current stage, load (1/2 or 2/2), whether you carry fragments, and the next step.
 - **Survives relogs:** which load you're on is saved per account and restored on login.
 
 ## Credits
