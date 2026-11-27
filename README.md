@@ -22,5 +22,9 @@ Assumes 73+ Agility (uses the 69 and 73 shortcuts) and blood runes only.
 
 ## Credits
 
+Based on [Easy Arceuus Runecrafting](https://github.com/poi56iop/easy-arceuus-runecrafting) by poi56iop
+(BSD 2-Clause). The highlight and screen tint approach, and the original stage logic this plugin reworks,
+come from that plugin.
+
 Dark Altar approach tile, Blood Altar reach and the Dark Altar to Blood Altar route are from
 [Jam's Arceuus Runecrafting](https://github.com/JamsRepos/zeah-rc-helper) (BSD 2-Clause).
